@@ -1,3 +1,18 @@
+"""
+Differentiable loss functions for ECG reconstruction.
+
+This module implements PRD and WWPRD losses that can be used directly
+as training objectives, aligning optimization with evaluation metrics.
+
+Author: [Your Name]
+Date: [Current Date]
+Course: TDK Project - ECG Denoising and Compression
+
+References:
+- PRD formula from ECG compression literature
+- WWPRD extension for clinical relevance
+"""
+
 import math
 from typing import Optional
 

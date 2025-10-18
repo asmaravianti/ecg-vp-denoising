@@ -40,5 +40,25 @@
 - Week 2: ablations, VP-layer proto, preliminary report.
 - Risks: weight design, CR accounting; mitigations included.
 
+### Appendix A — What we did this week (show quickly)
+- Implemented differentiable PRD and WWPRD (time- and STFT-frequency-weighted).
+- Verified optimization: losses decrease under gradient descent.
+- Built tiny 1D CAE and synthetic ECG+noise pipeline; WWPRD trends down during training.
+- Repo scaffold + README; meeting deck aligned to evaluation criteria.
+- Demo commands:
+  - `py -m ecgdae.losses` → prints PRD/WWPRD decreases.
+  - `py -m scripts.train_synthetic` → prints training WWPRD and before/after.
+
+### Appendix B — Literature snapshot (preliminary)
+- Classical compression: DWT/DCT, SPIHT/SET, wavelet packet codecs; metrics: PRD, WWPRD.
+- Deep learning: 1D CAEs for compression or denoising separately; training uses MSE; evaluation still PRD/WWPRD.
+- Gap we target: objective mismatch (train with MSE but evaluate with PRD/WWPRD). We propose differentiable WWPRD as the primary loss.
+- Next action: structured review table (methods, datasets, metrics, CR/PRD) by next meeting.
+
+### Appendix C — Next steps (2 weeks)
+- MIT-BIH + NSTDB pipeline; first PRD/WWPRD–CR curves.
+- Ablations: MSE vs PRD vs WWPRD; noise vs no-noise; bottleneck sizes.
+- VP-layer variant at fixed CR; compare rate–distortion–denoising.
+
 
 
