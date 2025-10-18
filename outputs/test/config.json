@@ -1,0 +1,26 @@
+{
+  "data_dir": "./data/mitbih",
+  "num_records": 3,
+  "window_seconds": 2.0,
+  "sample_rate": 360,
+  "noise_type": "nstdb",
+  "snr_db": 10.0,
+  "nstdb_noise": "muscle_artifact",
+  "model_type": "conv",
+  "hidden_dims": [
+    32,
+    64,
+    128
+  ],
+  "latent_dim": 32,
+  "loss_type": "wwprd",
+  "weight_alpha": 2.0,
+  "batch_size": 16,
+  "epochs": 5,
+  "lr": 0.001,
+  "weight_decay": 1e-05,
+  "val_split": 0.15,
+  "output_dir": "./outputs/test",
+  "save_model": false,
+  "device": "auto"
+}
