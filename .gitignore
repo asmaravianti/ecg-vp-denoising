@@ -51,3 +51,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Output directories
+outputs/
+*.ps1.bak
+
+# Temporary files
+tatus
+
