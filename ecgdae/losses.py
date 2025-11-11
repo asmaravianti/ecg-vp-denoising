@@ -26,6 +26,23 @@ class PRDLoss(nn.Module):
         return prd.mean()
 
 
+class PRDNormalizedLoss(nn.Module):
+    """PRD with mean-removed denominator (PRDN)."""
+
+    def __init__(self, eps: float = 1e-8):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, x: torch.Tensor, x_hat: torch.Tensor) -> torch.Tensor:
+        num = torch.sum((x - x_hat) ** 2, dim=(-1,))
+        x_centered = x - x.mean(dim=-1, keepdim=True)
+        den = torch.sum(x_centered ** 2, dim=(-1,)) + self.eps
+        prdn = 100.0 * torch.sqrt(num / den)
+        while prdn.dim() > 1:
+            prdn = prdn.mean(dim=-1)
+        return prdn.mean()
+
+
 class WWPRDLoss(nn.Module):
     """Waveform-Weighted PRD (time-domain weights).
 
@@ -35,6 +52,7 @@ class WWPRDLoss(nn.Module):
     def __init__(self, eps: float = 1e-8):
         super().__init__()
         self.eps = eps
+        self.requires_weights = True
 
     def forward(
         self,
@@ -52,6 +70,27 @@ class WWPRDLoss(nn.Module):
         while wwprd.dim() > 1:
             wwprd = wwprd.mean(dim=-1)
         return wwprd.mean()
+
+
+class CombinedPRDWWPRDLoss(nn.Module):
+    """Convex combination of PRDN and WWPRD losses."""
+
+    def __init__(self, alpha: float = 0.5, eps: float = 1e-8):
+        super().__init__()
+        self.alpha = alpha
+        self.prdn_loss = PRDNormalizedLoss(eps=eps)
+        self.wwprd_loss = WWPRDLoss(eps=eps)
+        self.requires_weights = True
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        x_hat: torch.Tensor,
+        w: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        prdn = self.prdn_loss(x, x_hat)
+        wwprd = self.wwprd_loss(x, x_hat, w)
+        return self.alpha * prdn + (1.0 - self.alpha) * wwprd
 
 
 class STFTWeightedWWPRDLoss(nn.Module):

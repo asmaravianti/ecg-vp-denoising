@@ -20,7 +20,13 @@ from rich.console import Console
 from rich.progress import track
 
 from ecgdae.data import MITBIHDataset, NSTDBNoiseMixer, WindowingConfig, gaussian_snr_mixer
-from ecgdae.losses import PRDLoss, WWPRDLoss, STFTWeightedWWPRDLoss
+from ecgdae.losses import (
+    PRDLoss,
+    PRDNormalizedLoss,
+    WWPRDLoss,
+    STFTWeightedWWPRDLoss,
+    CombinedPRDWWPRDLoss,
+)
 from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, count_parameters
 from ecgdae.metrics import batch_evaluate, format_metrics, compute_derivative_weights
 
@@ -61,10 +67,12 @@ def setup_args():
     
     # Loss parameters
     parser.add_argument("--loss_type", type=str, default="wwprd",
-                        choices=["mse", "prd", "wwprd", "stft_wwprd"],
+                        choices=["mse", "prd", "prdn", "wwprd", "combined", "stft_wwprd"],
                         help="Loss function type")
     parser.add_argument("--weight_alpha", type=float, default=2.0,
                         help="Alpha parameter for derivative-based WWPRD weights")
+    parser.add_argument("--combined_alpha", type=float, default=0.5,
+                        help="Alpha weight for PRDN in the combined loss")
     
     # Training parameters
     parser.add_argument("--batch_size", type=int, default=32,
@@ -120,8 +128,12 @@ def create_loss_function(args) -> nn.Module:
         return nn.MSELoss()
     elif args.loss_type == "prd":
         return PRDLoss()
+    elif args.loss_type == "prdn":
+        return PRDNormalizedLoss()
     elif args.loss_type == "wwprd":
         return WWPRDLoss()
+    elif args.loss_type == "combined":
+        return CombinedPRDWWPRDLoss(alpha=args.combined_alpha)
     elif args.loss_type == "stft_wwprd":
         return STFTWeightedWWPRDLoss()
     else:
@@ -243,7 +255,7 @@ def train_epoch(
         recon = model(noisy)
         
         # Compute loss
-        if use_weights and isinstance(loss_fn, WWPRDLoss):
+        if use_weights:
             weights = compute_wwprd_weights(clean, weight_alpha)
             loss = loss_fn(clean, recon, weights)
         else:
@@ -286,7 +298,7 @@ def validate(
         recon = model(noisy)
         
         # Compute loss
-        if use_weights and isinstance(loss_fn, WWPRDLoss):
+        if use_weights:
             weights = compute_wwprd_weights(clean, weight_alpha)
             loss = loss_fn(clean, recon, weights)
         else:
@@ -479,7 +491,7 @@ def main():
     # Training loop
     console.print("\n[bold green]Starting training...")
     
-    use_weights = (args.loss_type == "wwprd")
+    use_weights = getattr(loss_fn, "requires_weights", False)
     best_val_loss = float('inf')
     
     for epoch in track(range(1, args.epochs + 1), description="Training"):
