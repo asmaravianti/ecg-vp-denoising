@@ -329,22 +329,23 @@ def plot_training_curves(history: Dict[str, List[float]], output_dir: Path):
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
     
-    # PRD over epochs
+    # PRDN over epochs
     ax = axes[0, 1]
-    ax.plot(epochs, history['PRD'], 'g-', linewidth=2)
-    ax.axhline(y=4.33, color='r', linestyle='--', label='Excellent threshold', alpha=0.7)
-    ax.axhline(y=9.00, color='orange', linestyle='--', label='Very Good threshold', alpha=0.7)
+    series = history['PRDN'] if 'PRDN' in history and len(history['PRDN']) == len(history['PRD']) else history['PRD']
+    ax.plot(epochs, series, 'g-', linewidth=2)
+    ax.axhline(y=4.33, color='r', linestyle='--', label='Excellent', alpha=0.7)
+    ax.axhline(y=7.8, color='orange', linestyle='--', label='V. Good', alpha=0.7)
     ax.set_xlabel('Epoch', fontsize=12)
-    ax.set_ylabel('PRD (%)', fontsize=12)
-    ax.set_title('PRD over Training', fontsize=14, fontweight='bold')
+    ax.set_ylabel('PRDN (%)', fontsize=12)
+    ax.set_title('PRDN over Training', fontsize=14, fontweight='bold')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     
     # WWPRD over epochs
     ax = axes[1, 0]
     ax.plot(epochs, history['WWPRD'], 'm-', linewidth=2)
-    ax.axhline(y=7.4, color='r', linestyle='--', label='Excellent threshold', alpha=0.7)
-    ax.axhline(y=14.8, color='orange', linestyle='--', label='Very Good threshold', alpha=0.7)
+    ax.axhline(y=7.4, color='r', linestyle='--', label='Excellent', alpha=0.7)
+    ax.axhline(y=15.45, color='orange', linestyle='--', label='V. Good', alpha=0.7)
     ax.set_xlabel('Epoch', fontsize=12)
     ax.set_ylabel('WWPRD (%)', fontsize=12)
     ax.set_title('WWPRD over Training', fontsize=14, fontweight='bold')
@@ -401,14 +402,17 @@ def plot_reconstruction_examples(
         ax.plot(time, noisy[i, 0], 'gray', label='Noisy', linewidth=1, alpha=0.6)
         ax.plot(time, recon[i, 0], 'r--', label='Reconstructed', linewidth=1.5, alpha=0.8)
         
-        # Compute PRD for this sample
-        from ecgdae.metrics import compute_prd, compute_wwprd
-        prd = compute_prd(clean[i], recon[i])
-        wwprd = compute_wwprd(clean[i], recon[i])
+        # Compute PRDN and wavelet WWPRD for this sample
+        from ecgdae.metrics import compute_prdn, compute_wwprd_wavelet
+        prdn = compute_prdn(clean[i], recon[i])
+        try:
+            wwprd = compute_wwprd_wavelet(clean[i], recon[i])
+        except Exception:
+            wwprd = float('nan')
         
         ax.set_xlabel('Time (s)', fontsize=11)
         ax.set_ylabel('Amplitude', fontsize=11)
-        ax.set_title(f'Example {i+1} - PRD: {prd:.2f}%, WWPRD: {wwprd:.2f}%', 
+        ax.set_title(f'Example {i+1} - PRDN: {prdn:.2f}%, WWPRD: {wwprd:.2f}%', 
                     fontsize=12, fontweight='bold')
         ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
@@ -465,6 +469,7 @@ def main():
         'train_loss': [],
         'val_loss': [],
         'PRD': [],
+        'PRDN': [],
         'WWPRD': [],
         'SNR_out': [],
         'SNR_in': [],
@@ -497,6 +502,8 @@ def main():
         history['train_loss'].append(train_metrics['train_loss'])
         history['val_loss'].append(val_metrics['val_loss'])
         history['PRD'].append(val_metrics['PRD'])
+        if 'PRDN' in val_metrics:
+            history['PRDN'].append(val_metrics['PRDN'])
         history['WWPRD'].append(val_metrics['WWPRD'])
         history['SNR_out'].append(val_metrics['SNR_out'])
         if 'SNR_in' in val_metrics:
@@ -508,8 +515,10 @@ def main():
             console.print(f"\n[bold]Epoch {epoch}/{args.epochs}")
             console.print(f"  Train Loss: {train_metrics['train_loss']:.4f}")
             console.print(f"  Val Loss:   {val_metrics['val_loss']:.4f}")
-            console.print(f"  PRD:        {val_metrics['PRD']:.2f}% ({val_metrics.get('PRD_std', 0):.2f})")
-            console.print(f"  WWPRD:      {val_metrics['WWPRD']:.2f}% ({val_metrics.get('WWPRD_std', 0):.2f})")
+            console.print(f"  PRDN:       {val_metrics.get('PRDN', val_metrics['PRD']):.2f}% "
+                          f"({val_metrics.get('PRDN_std', val_metrics.get('PRD_std', 0)):.2f})")
+            console.print(f"  WWPRD:      {val_metrics['WWPRD']:.2f}% "
+                          f"({val_metrics.get('WWPRD_std', 0):.2f})")
             if 'SNR_improvement' in val_metrics:
                 console.print(f"  SNR Improv: {val_metrics['SNR_improvement']:.2f} dB")
         
@@ -549,7 +558,7 @@ def main():
     # Plot reconstruction examples
     plot_reconstruction_examples(model, val_loader, device, output_dir)
     
-    console.print(f"\n[bold green]✓ Training complete! Results saved to {output_dir}")
+    console.print(f"\n[bold green]Training complete! Results saved to {output_dir}")
 
 
 if __name__ == "__main__":

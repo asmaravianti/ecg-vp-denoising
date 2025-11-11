@@ -154,6 +154,7 @@ def evaluate_at_cr(
     model.eval()
 
     all_prds = []
+    all_prdns = []
     all_wwprds = []
     all_snr_ins = []
     all_snr_outs = []
@@ -201,17 +202,20 @@ def evaluate_at_cr(
             n = noisy[i, 0].cpu().numpy()
             r = recon[i, 0].cpu().numpy()
 
-            # Compute weights for WWPRD
-            w = compute_derivative_weights(c, alpha=weight_alpha)
-
-            # Compute metrics
+            # Compute metrics (paper-accurate)
+            from ecgdae.metrics import compute_prdn, compute_wwprd_wavelet
             prd = compute_prd(c, r)
-            wwprd = compute_wwprd(c, r, w)
+            prdn = compute_prdn(c, r)
+            try:
+                wwprd = compute_wwprd_wavelet(c, r)
+            except Exception:
+                wwprd = float('nan')
             snr_in = compute_snr(c, n)
             snr_out = compute_snr(c, r)
             snr_imp = snr_out - snr_in
 
             all_prds.append(prd)
+            all_prdns.append(prdn)
             all_wwprds.append(wwprd)
             all_snr_ins.append(snr_in)
             all_snr_outs.append(snr_out)
@@ -224,8 +228,10 @@ def evaluate_at_cr(
     metrics = {
         'PRD': float(np.mean(all_prds)),
         'PRD_std': float(np.std(all_prds)),
-        'WWPRD': float(np.mean(all_wwprds)),
-        'WWPRD_std': float(np.std(all_wwprds)),
+        'PRDN': float(np.mean(all_prdns)) if len(all_prdns) > 0 else float('nan'),
+        'PRDN_std': float(np.std(all_prdns)) if len(all_prdns) > 0 else float('nan'),
+        'WWPRD': float(np.nanmean(all_wwprds)),
+        'WWPRD_std': float(np.nanstd(all_wwprds)),
         'SNR_in': float(np.mean(all_snr_ins)),
         'SNR_out': float(np.mean(all_snr_outs)),
         'SNR_improvement': float(np.mean(all_snr_improvements)),
