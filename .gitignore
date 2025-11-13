@@ -52,7 +52,7 @@ Thumbs.db
 *.log
 
 # Output directories
-outputs/
+# outputs/
 *.ps1.bak
 
 # Temporary files
