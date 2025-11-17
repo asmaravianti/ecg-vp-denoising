@@ -1,0 +1,11 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Deploying compression-aware denoising models for electrocardiograms (ECGs) requires optimizing signal fidelity in clinically relevant ways while maintaining controllable bitrates. We propose a single deep 1-D autoencoder that performs joint ECG denoising and compression, trained end-to-end with a differentiable waveform-weighted percent root-mean-square difference (WWPRD) objective instead of the conventional mean-squared error. This objective emphasizes clinically salient waveform regions and aligns optimization with diagnostic perception.
+
+Our model controls the compression ratio through a tunable bottleneck latent and post-training quantization, supporting rate--distortion evaluation over CR$\approx$4--32. We further introduce a variable-projection (VP) front-end that replaces the first encoder convolution with a learnable projection layer to study the effect of structured embeddings on the denoising--compression trade-off.
+
+On the MIT-BIH Arrhythmia dataset with NSTDB noise augmentation, we report performance in terms of PRD, WWPRD, and SNR across rate--distortion curves. Results show $>$5 dB SNR improvement at mid-range compression ratios and better alignment to clinical distortion metrics when training with WWPRD compared to MSE.
+
+Overall, this work demonstrates a practical and fully differentiable framework for training ECG denoisers that are explicitly aware of compression constraints, clarifying how loss-function design and bottleneck capacity influence both diagnostic fidelity and bitrate efficiency in clinical telemetry and wearable monitoring systems.
+

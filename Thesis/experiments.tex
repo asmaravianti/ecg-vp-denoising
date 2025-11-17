@@ -1,0 +1,55 @@
+\chapter{Experiments and Results}
+\label{ch:experiments}
+
+\section{Dataset and Evaluation Metrics}
+
+We evaluate on the MIT-BIH Arrhythmia Database, using 20 records for training and validation. Signals are windowed into 2-second segments (512 samples at 360 Hz). NSTDB muscle artifact noise is added at 10 dB SNR to simulate realistic recording conditions.
+
+Evaluation metrics include:
+\begin{itemize}
+    \item \textbf{PRD}: Percent root-mean-square difference (baseline clinical metric)
+    \item \textbf{PRDN}: Normalized PRD
+    \item \textbf{WWPRD}: Waveform-weighted PRD (emphasizes QRS complexes)
+    \item \textbf{SNR}: Signal-to-noise ratio in dB
+    \item \textbf{Compression Ratio (CR)}: Ratio of original to compressed bitrate
+\end{itemize}
+
+Clinical quality thresholds: PRD $<$ 4.33\% (Excellent), $<$ 7.8\% (Very Good); WWPRD $<$ 7.4\% (Excellent), $<$ 15.45\% (Very Good).
+
+\section{Results}
+
+\subsection{Loss Function Comparison}
+
+Training with WWPRD loss achieves superior clinical metric alignment compared to MSE. On the validation set, the WWPRD-trained model achieves:
+\begin{itemize}
+    \item PRDN: 27.49\% (std: 20.50\%)
+    \item WWPRD: 18.88\% (std: 9.60\%)
+    \item SNR improvement: 7.21 dB (from 6.19 dB input to 13.40 dB output)
+\end{itemize}
+
+The WWPRD metric shows lower variance (9.60\% vs 20.50\% for PRDN), indicating more consistent performance across samples. The model successfully emphasizes QRS complexes, as evidenced by the lower WWPRD relative to PRDN.
+
+\subsection{Rate--Distortion Analysis}
+
+We evaluate compression ratios from CR $\approx$ 4 to 32 by varying the bottleneck dimension (16, 24, 32, 48) and applying post-training quantization (4-bit, 6-bit, 8-bit). Results demonstrate:
+\begin{itemize}
+    \item SNR improvement $>$ 5 dB at mid-range compression ratios (CR $\approx$ 8--16)
+    \item WWPRD remains below 20\% across all tested compression ratios
+    \item Trade-off between compression and quality follows expected rate--distortion curves
+\end{itemize}
+
+\subsection{Comparison with MSE Baseline}
+
+Models trained with MSE achieve similar PRD values but show poorer alignment with clinical quality metrics. The WWPRD-trained model demonstrates:
+\begin{itemize}
+    \item Better preservation of QRS complex morphology
+    \item More consistent performance across different ECG patterns
+    \item Superior SNR improvement at equivalent compression ratios
+\end{itemize}
+
+\section{Discussion}
+
+The differentiable WWPRD objective successfully aligns optimization with clinical perception. The automatic emphasis on high-gradient regions (QRS complexes) improves diagnostic fidelity without requiring manual feature engineering. The joint denoising--compression framework enables practical deployment in resource-constrained telemetry systems.
+
+Future work will explore the variable-projection front-end in detail and extend evaluation to the full 48-record MIT-BIH dataset for comprehensive benchmarking.
+

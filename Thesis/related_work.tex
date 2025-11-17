@@ -1,0 +1,11 @@
+\chapter{Related Work}
+\label{ch:related}
+
+ECG compression has been extensively studied, with methods ranging from transform-based approaches (DCT, wavelet) to modern deep learning techniques. Traditional methods like SPIHT and JPEG2000 achieve high compression ratios but require separate denoising stages. Recent autoencoder-based approaches enable joint denoising and compression, but most rely on MSE objectives that do not align with clinical quality perception.
+
+Waveform-weighted metrics have been proposed in ECG compression literature, but previous implementations require manual R-peak detection or fixed weighting schemes. Our differentiable WWPRD formulation eliminates this requirement by automatically deriving weights from signal derivatives.
+
+Variable projection methods have shown promise in signal processing for structured representations. We adapt this concept to the ECG domain by replacing the first encoder layer with a learnable projection, potentially improving compression efficiency.
+
+Our work bridges the gap between clinical quality metrics and differentiable training objectives, enabling end-to-end optimization of compression-aware denoising models.
+

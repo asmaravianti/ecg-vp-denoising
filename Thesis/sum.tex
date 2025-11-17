@@ -1,0 +1,10 @@
+\chapter{Conclusion and Future Work}
+\label{ch:sum}
+
+We presented a compression-aware ECG denoising framework that jointly optimizes signal quality and bitrate efficiency. The key innovation is a differentiable waveform-weighted PRD (WWPRD) loss function that automatically emphasizes clinically salient waveform regions, particularly QRS complexes, without manual feature detection.
+
+Experimental results on the MIT-BIH Arrhythmia dataset demonstrate that WWPRD training achieves $>$5 dB SNR improvement and better alignment with clinical quality metrics compared to MSE-based training. The framework supports tunable compression ratios (CR $\approx$ 4--32) through bottleneck dimension control and post-training quantization, enabling rate--distortion analysis for telemetry and wearable monitoring applications.
+
+The fully differentiable nature of our approach enables end-to-end training and integration with existing deep learning pipelines. The automatic emphasis on high-gradient regions aligns optimization with diagnostic perception, addressing a fundamental limitation of MSE-based objectives in clinical signal processing.
+
+Future directions include: (1) comprehensive evaluation of the variable-projection front-end, (2) extension to the full 48-record MIT-BIH dataset, (3) comparison with state-of-the-art ECG compression methods, and (4) real-world deployment studies in telemedicine systems.

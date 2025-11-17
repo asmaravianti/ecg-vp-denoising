@@ -1,0 +1,41 @@
+\chapter{Methodology}
+\label{ch:methodology}
+
+\section{Waveform-Weighted PRD Loss}
+
+The conventional PRD metric is defined as:
+\begin{equation}
+\text{PRD} = 100 \times \sqrt{\frac{\sum_{t=1}^{T}(x_t - \hat{x}_t)^2}{\sum_{t=1}^{T}x_t^2}}
+\end{equation}
+where $x_t$ is the clean signal and $\hat{x}_t$ is the reconstructed signal at time $t$.
+
+To emphasize clinically important waveform regions, we introduce waveform-weighted PRD (WWPRD):
+\begin{equation}
+\text{WWPRD} = 100 \times \sqrt{\frac{\sum_{t=1}^{T}w_t(x_t - \hat{x}_t)^2}{\sum_{t=1}^{T}w_t x_t^2}}
+\end{equation}
+where the weights $w_t$ are derived from signal derivatives:
+\begin{equation}
+w_t = 1 + \alpha \cdot \frac{|dx_t/dt|}{\max_t(|dx_t/dt|)}
+\end{equation}
+The parameter $\alpha$ (default 2.0) controls the emphasis strength. This formulation automatically highlights QRS complexes and other high-gradient regions without requiring manual R-peak detection.
+
+\section{Model Architecture}
+
+We employ a 1-D convolutional autoencoder with residual connections. The encoder progressively downsamples the input through stride-2 convolutions:
+\begin{itemize}
+    \item Input: 512 samples (2 seconds at 360 Hz)
+    \item Encoder: 4 layers with hidden dimensions [32, 64, 128, 32]
+    \item Bottleneck: 32 latent features (tunable for compression control)
+    \item Decoder: 4 transposed convolution layers mirroring the encoder
+\end{itemize}
+
+The model contains approximately 387K parameters. Compression ratio is controlled by the bottleneck dimension and post-training quantization (4-bit, 6-bit, or 8-bit).
+
+\section{Variable-Projection Front-End}
+
+We investigate replacing the first encoder convolution with a learnable variable-projection (VP) layer. This structured embedding layer projects input windows onto a learned basis, potentially improving the denoising--compression trade-off by capturing signal structure more efficiently than standard convolutions.
+
+\section{Training Configuration}
+
+Models are trained on 20 MIT-BIH records with NSTDB muscle artifact noise at 10 dB SNR. We use AdamW optimizer with learning rate 0.0005, weight decay 0.0001, and cosine annealing schedule over 50 epochs. The validation split is 15\%.
+

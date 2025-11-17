@@ -1,0 +1,16 @@
+\chapter{Introduction}
+\label{ch:intro}
+
+Electrocardiogram (ECG) monitoring in telemedicine and wearable devices requires efficient signal compression while preserving diagnostic quality. Traditional approaches separate denoising and compression into sequential stages, leading to suboptimal rate--distortion trade-offs. Recent deep learning methods have shown promise for joint denoising and compression, but most rely on mean-squared error (MSE) objectives that do not align with clinical perception of signal quality.
+
+Clinical ECG interpretation focuses on waveform morphology, particularly QRS complexes, P-waves, and T-waves. Standard MSE treats all signal regions equally, potentially sacrificing critical diagnostic features for marginal improvements in less important regions. This misalignment motivates waveform-weighted metrics that emphasize clinically salient regions.
+
+We address this gap by proposing a compression-aware ECG denoising framework that:
+\begin{itemize}
+    \item Employs a differentiable waveform-weighted PRD (WWPRD) loss function that automatically emphasizes high-gradient regions (QRS complexes) without manual peak detection
+    \item Integrates denoising and compression in a single end-to-end trainable autoencoder
+    \item Supports tunable compression ratios through latent bottleneck dimensions and post-training quantization
+    \item Introduces a variable-projection (VP) front-end to study structured embedding effects
+\end{itemize}
+
+Our contributions include: (1) a fully differentiable WWPRD objective that aligns training with clinical quality metrics, (2) comprehensive rate--distortion analysis on the MIT-BIH dataset with realistic noise augmentation, and (3) empirical validation showing $>$5 dB SNR improvement and superior clinical metric alignment compared to MSE-based training.
