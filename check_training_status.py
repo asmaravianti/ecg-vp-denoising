@@ -1,68 +1,40 @@
-"""Check training status and results."""
+"""Check training status for Person B"""
 import torch
 import json
 from pathlib import Path
 
-# Check WWPRD model
-wwprd_path = Path("outputs/loss_comparison_wwprd/best_model.pth")
-if wwprd_path.exists():
-    print("=" * 60)
-    print("WWPRD Model Status:")
-    print("=" * 60)
-    ckpt = torch.load(str(wwprd_path), map_location='cpu', weights_only=False)
-    print(f"Epoch: {ckpt.get('epoch', 'N/A')}")
-    print(f"Val Loss: {ckpt.get('val_loss', 'N/A'):.4f}")
-    val_metrics = ckpt.get('val_metrics', {})
-    print(f"Val Metrics:")
-    for k, v in val_metrics.items():
-        if isinstance(v, (int, float)):
-            print(f"  {k}: {v:.4f}")
-        else:
-            print(f"  {k}: {v}")
+model_path = Path("outputs/wwprd_latent8_improved/best_model.pth")
+config_path = Path("outputs/wwprd_latent8_improved/config.json")
+metrics_path = Path("outputs/wwprd_latent8_improved/final_metrics.json")
+
+print("=" * 60)
+print("PERSON B - Training Status Check")
+print("=" * 60)
+
+if model_path.exists():
+    ckpt = torch.load(str(model_path), map_location='cpu', weights_only=False)
+    epoch = ckpt.get('epoch', 'N/A')
+    val_loss = ckpt.get('val_loss', 'N/A')
+    print(f"✓ Model exists")
+    print(f"  Current epoch: {epoch}")
+    print(f"  Validation loss: {val_loss:.4f}" if isinstance(val_loss, float) else f"  Validation loss: {val_loss}")
 else:
-    print("WWPRD model not found")
+    print("✗ Model not found")
 
-# Check for training history
-history_path = Path("outputs/loss_comparison_wwprd/training_history.json")
-if history_path.exists():
-    print("\nTraining History found!")
-    with open(history_path) as f:
-        history = json.load(f)
-    print(f"Total epochs: {len(history.get('train_loss', []))}")
-    if history.get('train_loss'):
-        print(f"Final train loss: {history['train_loss'][-1]:.4f}")
-        print(f"Final val loss: {history['val_loss'][-1]:.4f}")
-else:
-    print("\nNo training history found - training may not have completed")
+if config_path.exists():
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    print(f"\n✓ Config exists")
+    print(f"  Target epochs: {config.get('epochs', 'N/A')}")
+    print(f"  Current epoch: {epoch if model_path.exists() else 'N/A'}")
 
-# Check for combined model
-combined_dirs = list(Path("outputs").glob("loss_comparison_combined*"))
-if combined_dirs:
-    print("\n" + "=" * 60)
-    print("Combined Model Status:")
-    print("=" * 60)
-    for d in combined_dirs:
-        model_path = d / "best_model.pth"
-        if model_path.exists():
-            ckpt = torch.load(str(model_path), map_location='cpu', weights_only=False)
-            print(f"\n{d.name}:")
-            print(f"  Epoch: {ckpt.get('epoch', 'N/A')}")
-            print(f"  Val Loss: {ckpt.get('val_loss', 'N/A'):.4f}")
-else:
-    print("\n" + "=" * 60)
-    print("Combined Model: Not found")
-    print("=" * 60)
+if metrics_path.exists():
+    with open(metrics_path, 'r') as f:
+        metrics = json.load(f)
+    print(f"\n✓ Final metrics available:")
+    print(f"  PRD: {metrics.get('PRD', 0):.2f}%")
+    print(f"  PRDN: {metrics.get('PRDN', 0):.2f}%")
+    print(f"  WWPRD: {metrics.get('WWPRD', 0):.2f}%")
+    print(f"  SNR improvement: {metrics.get('SNR_improvement', 0):.2f} dB")
 
-# Check for summary
-summary_path = Path("outputs/loss_comparison_summary.json")
-if summary_path.exists():
-    print("\n" + "=" * 60)
-    print("Comparison Summary Found!")
-    print("=" * 60)
-    with open(summary_path) as f:
-        summary = json.load(f)
-    print("Summary keys:", list(summary.keys()))
-else:
-    print("\nNo comparison summary found")
-
-
+print("\n" + "=" * 60)
