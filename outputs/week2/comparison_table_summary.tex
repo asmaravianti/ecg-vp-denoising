@@ -1,0 +1,41 @@
+\begin{table}[h]
+\centering
+\caption{Compression Ratio Evaluation: QS and QSN Scores for Different Latent Dimensions}
+\label{tab:compression_comparison}
+\begin{tabular}{ccccccc}
+\toprule
+Latent Dim & CR & PRD (\%) & PRDN (\%) & WWPRD (\%) & QS & QSN \\
+\midrule
+\multirow{4}{*}{8} & 5.50 & 35.81 & 37.86 & 31.93 & 0.1536 & 0.1453 \\
+ & 5.50 & 35.41 & 37.33 & 31.64 & 0.1553 & 0.1473 \\
+ & 5.50 & 35.56 & 37.51 & 31.92 & 0.1547 & 0.1466 \\
+ & 5.50 & 35.05 & 36.91 & 31.70 & 0.1569 & 0.1490 \\
+\midrule
+\multirow{4}{*}{16} & 2.75 & 37.20 & 40.71 & 32.48 & 0.0739 & 0.0676 \\
+ & 2.75 & 36.95 & 40.11 & 32.39 & 0.0744 & 0.0686 \\
+ & 2.75 & 36.17 & 39.25 & 32.19 & 0.0760 & 0.0701 \\
+ & 2.75 & 36.56 & 39.60 & 31.96 & 0.0752 & 0.0694 \\
+\midrule
+\multirow{4}{*}{32} & 1.38 & 33.85 & 36.21 & 31.39 & 0.0406 & 0.0380 \\
+ & 1.38 & 34.02 & 36.52 & 31.36 & 0.0404 & 0.0377 \\
+ & 1.38 & 34.04 & 36.45 & 31.24 & 0.0404 & 0.0377 \\
+ & 1.38 & 35.60 & 38.15 & 32.39 & 0.0386 & 0.0360 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Best Performance Summary by Latent Dimension}
+\label{tab:best_performance}
+\begin{tabular}{cccccc}
+\toprule
+Latent Dim & Best CR & Best PRD (\%) & Best WWPRD (\%) & Best QS & Best QSN \\
+\midrule
+8 & 5.50 & 35.05 & 31.64 & 0.1569 & 0.1490 \\
+16 & 2.75 & 36.17 & 31.96 & 0.0760 & 0.0701 \\
+32 & 1.38 & 33.85 & 31.24 & 0.0406 & 0.0380 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
