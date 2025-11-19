@@ -19,7 +19,7 @@ python scripts/train_mitbih.py `
     --device auto
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "✓ Training completed!" -ForegroundColor Green
+    Write-Host "Training completed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Next: Evaluate the model" -ForegroundColor Cyan
     Write-Host "  python scripts/evaluate_compression.py --model_path outputs/wwprd_latent4_highcr/best_model.pth --config_path outputs/wwprd_latent4_highcr/config.json --compression_ratios 8 16 32 --quantization_bits 4 --output_file outputs/week2/wwprd_latent4_results.json"

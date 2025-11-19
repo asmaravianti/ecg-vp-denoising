@@ -1,39 +1,68 @@
-"""显示汇总表格 - 3个模型的最佳性能对比"""
+"""Summarize best scores for every model QS table under outputs/week2."""
 import json
 from pathlib import Path
+from typing import Dict, List
 
-files = [
-    'outputs/week2/wwprd_latent8_qs_table.json',
-    'outputs/week2/wwprd_latent16_qs_table.json',
-    'outputs/week2/wwprd_latent32_qs_table.json'
-]
+RESULTS_DIR = Path("outputs/week2")
+qs_files = sorted(RESULTS_DIR.glob("*_qs_table.json"))
 
-print("=" * 90)
+if not qs_files:
+    raise SystemExit("No *_qs_table.json files found in outputs/week2/")
+
+rows: List[Dict[str, float]] = []
+
+print("=" * 100)
 print("SUMMARY TABLE - Best Performance by Model")
-print("=" * 90)
-print(f"{'Model':<20} {'CR':<8} {'PRD(%)':<10} {'PRDN(%)':<10} {'WWPRD(%)':<12} {'QS':<12} {'QSN':<12}")
-print("-" * 90)
+print("=" * 100)
+print(
+    f"{'Model':<30} {'CR':<8} {'PRD(%)':<10} {'PRDN(%)':<10} "
+    f"{'WWPRD(%)':<12} {'QS':<12} {'QSN':<12}"
+)
+print("-" * 100)
 
-for f in files:
-    data = json.load(open(f))
-    model = data['model']
-    results = data['results']
+for file_path in qs_files:
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    best_cr = max(r['CR'] for r in results)
-    best_prd = min(r['PRD'] for r in results)
-    best_prdn = min(r['PRDN'] for r in results)
-    best_wwprd = min(r['WWPRD'] for r in results)
-    best_qs = max(r['QS'] for r in results)
-    best_qsn = max(r['QSN'] for r in results)
+    model = data.get("model", file_path.stem.replace("_qs_table", ""))
+    results = data.get("results", [])
+    if not results:
+        continue
 
-    print(f"{model:<20} {best_cr:<8.2f} {best_prd:<10.2f} {best_prdn:<10.2f} "
-          f"{best_wwprd:<12.2f} {best_qs:<12.4f} {best_qsn:<12.4f}")
+    best_entry = max(results, key=lambda r: r.get("QS", 0.0))
 
-print("=" * 90)
-print("\nKey Findings:")
-print("- Latent_dim=8: Highest CR (5.50:1) and best QS/QSN scores")
-print("- Latent_dim=16: Medium CR (2.75:1) with moderate QS/QSN")
-print("- Latent_dim=32: Lowest CR (1.38:1) but best PRD/WWPRD quality")
+    row = {
+        "model": model,
+        "CR": best_entry["CR"],
+        "PRD": best_entry["PRD"],
+        "PRDN": best_entry["PRDN"],
+        "WWPRD": best_entry["WWPRD"],
+        "QS": best_entry["QS"],
+        "QSN": best_entry["QSN"],
+    }
+    rows.append(row)
+
+    print(
+        f"{model:<30} {row['CR']:<8.2f} {row['PRD']:<10.2f} {row['PRDN']:<10.2f} "
+        f"{row['WWPRD']:<12.2f} {row['QS']:<12.4f} {row['QSN']:<12.4f}"
+    )
+
+print("=" * 100)
+
+if rows:
+    top_qs = max(rows, key=lambda r: r["QS"])
+    top_cr = max(rows, key=lambda r: r["CR"])
+
+    print("\nKey Findings:")
+    print(
+        f"- Best QS: {top_qs['model']} (CR={top_qs['CR']:.2f}:1, QS={top_qs['QS']:.3f}, "
+        f"QSN={top_qs['QSN']:.3f})"
+    )
+    print(
+        f"- Highest CR achieved: {top_cr['model']} (CR={top_cr['CR']:.2f}:1, "
+        f"QS={top_cr['QS']:.3f})"
+    )
+
 print("\nAll tables saved in: outputs/week2/")
 print("  - *_qs_table.json (JSON format)")
 print("  - *_qs_table.tex (LaTeX format)")
