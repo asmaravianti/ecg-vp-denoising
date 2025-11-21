@@ -26,6 +26,7 @@ from ecgdae.losses import (
     WWPRDLoss,
     STFTWeightedWWPRDLoss,
     CombinedPRDWWPRDLoss,
+    WWPRDL1Loss,
 )
 from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, count_parameters
 from ecgdae.metrics import batch_evaluate, format_metrics, compute_derivative_weights
@@ -67,12 +68,16 @@ def setup_args():
 
     # Loss parameters
     parser.add_argument("--loss_type", type=str, default="wwprd",
-                        choices=["mse", "prd", "prdn", "wwprd", "combined", "stft_wwprd"],
+                        choices=["mse", "prd", "prdn", "wwprd", "combined", "stft_wwprd", "wwprd_l1"],
                         help="Loss function type")
     parser.add_argument("--weight_alpha", type=float, default=2.0,
                         help="Alpha parameter for derivative-based WWPRD weights")
     parser.add_argument("--combined_alpha", type=float, default=0.5,
                         help="Alpha weight for PRDN in the combined loss")
+    parser.add_argument("--l1_weight", type=float, default=1e-4,
+                        help="Weight for latent L1 regularization when using wwprd_l1 loss")
+    parser.add_argument("--l1_mode", type=str, default="mul", choices=["add", "mul"],
+                        help="How to combine latent L1 penalty with WWPRD (add or mul)")
 
     # Training parameters
     parser.add_argument("--batch_size", type=int, default=32,
@@ -140,6 +145,8 @@ def create_loss_function(args) -> nn.Module:
         return CombinedPRDWWPRDLoss(alpha=args.combined_alpha)
     elif args.loss_type == "stft_wwprd":
         return STFTWeightedWWPRDLoss()
+    elif args.loss_type == "wwprd_l1":
+        return WWPRDL1Loss(weight=args.l1_weight, mode=args.l1_mode)
     else:
         raise ValueError(f"Unknown loss type: {args.loss_type}")
 
@@ -251,16 +258,26 @@ def train_epoch(
     total_loss = 0.0
     num_batches = 0
 
+    requires_latent = getattr(loss_fn, "requires_latent", False)
+
     for noisy, clean in train_loader:
         noisy = noisy.to(device)
         clean = clean.to(device)
 
         # Forward pass
-        recon = model(noisy)
+        if requires_latent:
+            recon, latents = model(noisy, return_latent=True)
+        else:
+            recon = model(noisy)
+            latents = None
 
         # Compute loss
+        weights = None
         if use_weights:
             weights = compute_wwprd_weights(clean, weight_alpha)
+        if requires_latent:
+            loss = loss_fn(clean, recon, latents, weights)
+        elif use_weights:
             loss = loss_fn(clean, recon, weights)
         else:
             loss = loss_fn(clean, recon)
@@ -294,16 +311,26 @@ def validate(
     all_recon = []
     all_noisy = []
 
+    requires_latent = getattr(loss_fn, "requires_latent", False)
+
     for noisy, clean in val_loader:
         noisy = noisy.to(device)
         clean = clean.to(device)
 
         # Forward pass
-        recon = model(noisy)
+        if requires_latent:
+            recon, latents = model(noisy, return_latent=True)
+        else:
+            recon = model(noisy)
+            latents = None
 
         # Compute loss
+        weights = None
         if use_weights:
             weights = compute_wwprd_weights(clean, weight_alpha)
+        if requires_latent:
+            loss = loss_fn(clean, recon, latents, weights)
+        elif use_weights:
             loss = loss_fn(clean, recon, weights)
         else:
             loss = loss_fn(clean, recon)

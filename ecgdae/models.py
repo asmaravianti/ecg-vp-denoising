@@ -130,14 +130,15 @@ class ConvAutoEncoder(nn.Module):
         """
         return self.decoder(z)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_latent: bool = False):
         """Forward pass through autoencoder.
         
         Args:
             x: Input signal (B, C, T)
+            return_latent: Whether to also return latent tensor.
             
         Returns:
-            Reconstructed signal (B, C, T)
+            Reconstructed signal (and optionally latent representation)
         """
         z = self.encode(x)
         x_recon = self.decode(z)
@@ -146,6 +147,8 @@ class ConvAutoEncoder(nn.Module):
         if x_recon.shape[-1] != x.shape[-1]:
             x_recon = x_recon[..., :x.shape[-1]]
         
+        if return_latent:
+            return x_recon, z
         return x_recon
     
     def get_latent_dim(self, input_length: int) -> int:
@@ -261,7 +264,7 @@ class ResidualAutoEncoder(nn.Module):
     def decode(self, z: torch.Tensor) -> torch.Tensor:
         return self.decoder(z)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, return_latent: bool = False):
         z = self.encode(x)
         x_recon = self.decode(z)
         
@@ -269,6 +272,8 @@ class ResidualAutoEncoder(nn.Module):
         if x_recon.shape[-1] != x.shape[-1]:
             x_recon = x_recon[..., :x.shape[-1]]
         
+        if return_latent:
+            return x_recon, z
         return x_recon
 
 

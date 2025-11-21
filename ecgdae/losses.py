@@ -72,6 +72,44 @@ class WWPRDLoss(nn.Module):
         return wwprd.mean()
 
 
+class WWPRDL1Loss(nn.Module):
+    """WWPRD loss augmented with latent L1 sparsity regularization."""
+
+    def __init__(
+        self,
+        weight: float = 1e-4,
+        mode: str = "mul",
+        eps: float = 1e-8,
+    ):
+        super().__init__()
+        if mode not in {"add", "mul"}:
+            raise ValueError(f"Unknown l1_mode: {mode}")
+        self.weight = weight
+        self.mode = mode
+        self.base_loss = WWPRDLoss(eps=eps)
+        self.requires_weights = True
+        self.requires_latent = True
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        x_hat: torch.Tensor,
+        latent: torch.Tensor,
+        w: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        if latent is None:
+            raise ValueError("WWPRDL1Loss requires latent representation.")
+
+        base = self.base_loss(x, x_hat, w)
+        if self.weight <= 0:
+            return base
+
+        l1_term = latent.abs().mean()
+        if self.mode == "mul":
+            return base * (1.0 + self.weight * l1_term)
+        return base + self.weight * l1_term
+
+
 class CombinedPRDWWPRDLoss(nn.Module):
     """Convex combination of PRDN and WWPRD losses."""
 
