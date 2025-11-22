@@ -5,7 +5,7 @@
 	%twoside, % Double sided format
 	%draft, % Quicker draft compilation without rendering images
 	%final, % Set final to hide todos
-]{elteiktdk}[2024/04/26]
+]{elteiktdk}[2025/11/26]
 
 % The minted package is also supported for source highlighting
 %\usepackage[newfloat]{minted}
@@ -15,23 +15,26 @@
 \date{2025}
 
 % Author(s)' metadata
-\author{John Smith}
-\degree{Computer Science MSc}
-\period{V. grade}
-\coauthor{Jane Smith}
-\codegree{Computer Science MSc}
-\coperiod{IV. grade}
+\author{Gracia Asmara Vianti El}
+\degree{Computer Science BSc}
+% Define periodname to avoid undefined control sequence error
+\newcommand{\periodname}{}
+\newcommand{\coperiodname}{}
+
+\coauthor{Xu Jinxi}
+\codegree{Computer Science BSc}
+
 
 % Superivsor(s)' metadata
-\supervisor{John Doe}
-\affiliation{Assistant Lecturer}
-\cosupervisor{Jane Doe}
-\coaffiliation{PhD Student}
+\supervisor{Dr. Kovacs Peter}
+\affiliation{Associate professor}
+
+
 
 % University's metadata
 \university{Eötvös Loránd University}
 \faculty{Faculty of Informatics}
-\department{Dept. of Software Technology and Methodology}
+\department{Dept. of Numerical Analysis}
 \city{Budapest}
 \logo{elte_cimer_szines}
 
@@ -81,7 +84,9 @@
 % Acknowledgements (optional) - in case your thesis received funding or would like to express special thanks to someone
 \chapter*{\acklabel}
 \addcontentsline{toc}{chapter}{\acklabel}
-In case your TDK thesis received financial support from a project or the university, it is usually required to indicate the proper attribution in the thesis itself. Special thanks can also be expressed towards teachers, fellow students and colleagues who helped you in the process of creating your thesis.
+\input{acknowledgements.tex}
+
+
 
 % Appendices (optional) - useful for detailed information in long tables, many and/or large figures, etc.
 % \appendix

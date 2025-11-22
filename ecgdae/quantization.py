@@ -273,3 +273,96 @@ def dequantize_latent(
         metadata['quantization_bits']
     )
 
+
+def quantize_with_ste(
+    latent: torch.Tensor,
+    quantization_bits: int,
+    min_val: Optional[float] = None,
+    max_val: Optional[float] = None,
+) -> torch.Tensor:
+    """Quantize latent with Straight-Through Estimator for training.
+
+    Forward pass: quantizes the latent
+    Backward pass: passes gradients through as if quantization was identity
+
+    This enables quantization-aware training (QAT) by simulating quantization
+    during training while allowing gradients to flow through.
+
+    Args:
+        latent: Latent tensor (B, C, T) or (B, C*T)
+        quantization_bits: Number of quantization bits
+        min_val: Optional min value (if None, computed from latent)
+        max_val: Optional max value (if None, computed from latent)
+
+    Returns:
+        Dequantized latent tensor (same shape as input)
+    """
+    # Store original shape
+    original_shape = latent.shape
+    latent_flat = latent.flatten(1)  # (B, C*T)
+
+    # Compute quantization range per sample
+    batch_size = latent_flat.shape[0]
+    dequantized_batch = []
+
+    for b in range(batch_size):
+        sample_latent = latent_flat[b]
+
+        # Compute quantization range for this sample
+        if min_val is None:
+            sample_min = sample_latent.min().item()
+        else:
+            sample_min = min_val
+        if max_val is None:
+            sample_max = sample_latent.max().item()
+        else:
+            sample_max = max_val
+
+        if sample_max == sample_min:
+            sample_max = sample_min + 1e-6
+
+        # Quantize (forward pass)
+        n_levels = 2 ** quantization_bits
+        normalized = (sample_latent - sample_min) / (sample_max - sample_min)
+        normalized = torch.clamp(normalized, 0.0, 1.0)
+        quantized_int = torch.round(normalized * (n_levels - 1))
+
+        # Dequantize
+        quantized_normalized = quantized_int / (n_levels - 1)
+        dequantized = sample_min + quantized_normalized * (sample_max - sample_min)
+
+        dequantized_batch.append(dequantized)
+
+    # Stack and reshape
+    dequantized_flat = torch.stack(dequantized_batch)  # (B, C*T)
+    dequantized = dequantized_flat.reshape(original_shape)
+
+    # Straight-Through Estimator: forward uses quantized, backward uses identity
+    return latent + (dequantized - latent).detach()
+
+
+def add_quantization_noise(
+    latent: torch.Tensor,
+    quantization_bits: int,
+    noise_scale: float = 1.0,
+) -> torch.Tensor:
+    """Add uniform quantization noise to simulate quantization during training.
+
+    Alternative to exact quantization - adds noise with same variance as quantization error.
+    Sometimes more stable during training than exact quantization.
+
+    Args:
+        latent: Latent tensor
+        quantization_bits: Target quantization bits
+        noise_scale: Scale of noise (1.0 = full quantization noise)
+
+    Returns:
+        Noisy latent tensor
+    """
+    n_levels = 2 ** quantization_bits
+    quantization_step = 1.0 / n_levels
+
+    # Uniform noise in range [-step/2, step/2]
+    noise = (torch.rand_like(latent) - 0.5) * quantization_step * noise_scale
+
+    return latent + noise

@@ -1,16 +1,34 @@
 \chapter{Introduction}
 \label{ch:intro}
 
-Electrocardiogram (ECG) monitoring in telemedicine and wearable devices requires efficient signal compression while preserving diagnostic quality. Traditional approaches separate denoising and compression into sequential stages, leading to suboptimal rate--distortion trade-offs. Recent deep learning methods have shown promise for joint denoising and compression, but most rely on mean-squared error (MSE) objectives that do not align with clinical perception of signal quality.
+Electrocardiogram (ECG) monitoring underpins remote cardiac diagnostics, yet transmitting denoised signals with strict bitrate budgets remains challenging. Hospital telemetry links and wearable devices are constrained by low-power radios, limited flash memory, and intermittent connectivity. Conventional pipelines perform denoising first and compression second, so the denoiser is unaware of downstream bitrate constraints and the compressor is unaware of clinical morphology needs. This thesis develops a unified alternative in which a single model denoises \emph{and} compresses while being optimized directly for clinically meaningful fidelity metrics.
 
-Clinical ECG interpretation focuses on waveform morphology, particularly QRS complexes, P-waves, and T-waves. Standard MSE treats all signal regions equally, potentially sacrificing critical diagnostic features for marginal improvements in less important regions. This misalignment motivates waveform-weighted metrics that emphasize clinically salient regions.
+\section{Problem Statement and Motivation}
 
-We address this gap by proposing a compression-aware ECG denoising framework that:
+Two practical issues motivate this work. First, most deep learning denoisers minimize mean-squared error (MSE), a metric that treats the baseline and P-wave plateaus the same as high-gradient QRS complexes. Cardiologists, however, judge quality by whether the waveform morphology needed for diagnosis remains intact. Second, rate--distortion control in existing ECG compressors is typically obtained through heuristic quantizers that are tuned post-hoc. Without differentiable awareness of bitrate, the training objective is disconnected from deployment reality, leading to unpredictable behaviour once the model is quantized or pushed to high compression ratios.
+
+Our research question is therefore: \textit{Can we train a single convolutional autoencoder that simultaneously denoises and compresses ECG signals, remains differentiable end-to-end, and optimizes an explicitly clinical loss while respecting compression constraints?}
+
+\section{Project Goals and Scope}
+
+The project explores a compression-aware pipeline on the MIT-BIH Arrhythmia database with realistic NSTDB noise augmentation. The scope covers:
 \begin{itemize}
-    \item Employs a differentiable waveform-weighted PRD (WWPRD) loss function that automatically emphasizes high-gradient regions (QRS complexes) without manual peak detection
-    \item Integrates denoising and compression in a single end-to-end trainable autoencoder
-    \item Supports tunable compression ratios through latent bottleneck dimensions and post-training quantization
-    \item Introduces a variable-projection (VP) front-end to study structured embedding effects
+    \item Designing a waveform-weighted percent root-mean-square difference (WWPRD) objective whose weights automatically track diagnostically salient regions without manual R-peak detection.
+    \item Building a variable-projection (VP) front-end autoencoder capable of toggling latents between 2 and 32 channels to traverse compression ratios from roughly 1.4:1 to 22.0:1.
+    \item Implementing quantization-aware training (QAT) so that 4-bit post-training deployment exhibits less than $1.3\times$ degradation relative to clean validation, achieving Quality Score (QS) $>$ 0.5.
+    \item Providing tooling---scripts, configuration files, and experiment trackers---that allow re-running every experiment described in this thesis.
 \end{itemize}
 
-Our contributions include: (1) a fully differentiable WWPRD objective that aligns training with clinical quality metrics, (2) comprehensive rate--distortion analysis on the MIT-BIH dataset with realistic noise augmentation, and (3) empirical validation showing $>$5 dB SNR improvement and superior clinical metric alignment compared to MSE-based training.
+\section{Scientific Novelty and Contributions}
+
+The novelty of the thesis can be summarized as follows:
+\begin{enumerate}
+    \item A fully differentiable WWPRD formulation that derives weights from the first derivative of the input signal, aligning the training signal with diagnostic priorities while avoiding brittle pre-processing.
+    \item A VP front-end that constrains the first encoder layer to learn projection filters, improving latent structure at very low bitrates.
+    \item A QAT regime that stochastically injects quantization during training and demonstrably shrinks the quantization gap from 2.2$\times$ to below 1.3$\times$ across the considered compression ratios.
+    \item A comprehensive verification protocol that covers cross-record validation, latency measurements, rate--distortion sweeps, and statistical robustness analysis.
+\end{enumerate}
+
+\section{Thesis Organization}
+
+Chapter~\ref{ch:related} situates the work against classical transform coding, sparse coding, and recent neural compressors. Chapter~\ref{ch:methodology} details the WWPRD loss, VP architecture, training procedure, and software artefacts, while Chapter~\ref{ch:experiments} verifies the approach through quantitative tables, qualitative waveform inspection, and ablation studies. Chapter~\ref{ch:sum} consolidates scientific value, reflects on limitations, and provides a structured reviewer-style assessment of novelty, verification depth, literature coverage, formal presentation, and overall quality.

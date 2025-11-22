@@ -1,11 +1,25 @@
 \chapter{Related Work}
 \label{ch:related}
 
-ECG compression has been extensively studied, with methods ranging from transform-based approaches (DCT, wavelet) to modern deep learning techniques. Traditional methods like SPIHT and JPEG2000 achieve high compression ratios but require separate denoising stages. Recent autoencoder-based approaches enable joint denoising and compression, but most rely on MSE objectives that do not align with clinical quality perception.
+Joint ECG denoising and compression spans several decades of research, beginning with transform coding and more recently transitioning to end-to-end neural methods. This chapter positions our approach relative to four main strands: classical transform-based compression, sparse and dictionary techniques, deep autoencoders, and clinical loss engineering combined with quantization-aware training.
 
-Waveform-weighted metrics have been proposed in ECG compression literature, but previous implementations require manual R-peak detection or fixed weighting schemes. Our differentiable WWPRD formulation eliminates this requirement by automatically deriving weights from signal derivatives.
+\section{Classical Transform-Based Compression}
 
-Variable projection methods have shown promise in signal processing for structured representations. We adapt this concept to the ECG domain by replacing the first encoder layer with a learnable projection, potentially improving compression efficiency.
+Early algorithms rely on transforms such as discrete cosine transform (DCT), discrete wavelet transform (DWT), and set partitioning in hierarchical trees (SPIHT). These methods achieve impressive compression ratios (often $>$10:1) but operate on the assumption that denoising either happens before the transform or is unnecessary because the transform coefficients can be thresholded. Separating denoising from compression creates a brittle pipeline: any residual noise that leaks into the transform stage consumes bitrate budget, and the orthogonality of the transform ignores clinical priorities such as QRS preservation.
 
-Our work bridges the gap between clinical quality metrics and differentiable training objectives, enabling end-to-end optimization of compression-aware denoising models.
+\section{Sparse Coding and Dictionary Learning}
+
+Dictionary learning approaches (e.g., K-SVD, orthogonal matching pursuit) learn overcomplete basis functions tailored to ECG morphology. Because they enforce sparsity, they can be interpreted as performing a form of compression. However, they still treat denoising as a pre-processing step and optimize reconstruction using MSE. Some works introduce adaptive weighting, but they require explicit R-peak detection or handcrafted windows, which raises robustness concerns in noisy ambulatory recordings.
+
+\section{Deep Autoencoders and Latent Bottlenecks}
+
+Recent convolutional and recurrent autoencoders unify denoising and compression. They map fixed-length ECG segments into a latent bottleneck and reconstruct them with transposed convolutions. Despite their expressivity, two limitations persist: (1) the use of MSE or $\ell_1$ loss leads to clinically misaligned reconstructions, and (2) compression control is coarse, often achieved by pruning channels or applying uniform scalar quantizers only after training. Our work extends this line by introducing latent dimensionality sweeps (4, 8, 16, 32) paired with in-training quantization to enforce realistic bitrate targets.
+
+\section{Clinically Weighted Objectives}
+
+Perceptual metrics tailored to ECGs typically weight segments around R-peaks, QRS complexes, or T-waves. While effective, they depend on accurate detection of fiducial points. False detections at high noise levels can actually reduce fidelity by over-weighting incorrect regions. We instead derive weights from the normalized signal derivative, resulting in a waveform-weighted PRD (WWPRD) formulation that is differentiable and does not require auxiliary detectors.
+
+\section{Compression-Aware Optimization and Quantization}
+
+Quantization-aware training is common in computer vision, yet its application to streaming biosignals remains limited. Prior ECG compressors usually quantize the latent or coefficient streams only after training, observe the degradation, and accept the loss. We treat quantization as a stochastic operation inside the computational graph, using straight-through estimators, rate penalties, and learning-rate schedules tuned for robustness. The combination of WWPRD with VP front-ends and QAT yields a pipeline that is simultaneously clinically grounded and bitrate-aware, bridging a gap left by previous studies.
 

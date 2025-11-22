@@ -8,6 +8,7 @@ Week 1 deliverable:
 
 import argparse
 import json
+import random
 from pathlib import Path
 from typing import Dict, List
 
@@ -90,6 +91,16 @@ def setup_args():
                         help="Weight decay")
     parser.add_argument("--val_split", type=float, default=0.15,
                         help="Validation split ratio")
+
+    # QAT (Quantization-Aware Training) parameters
+    parser.add_argument("--quantization_aware", action="store_true",
+                        help="Enable quantization-aware training")
+    parser.add_argument("--quantization_bits", type=int, default=4,
+                        help="Quantization bits for QAT (default: 4)")
+    parser.add_argument("--qat_probability", type=float, default=0.5,
+                        help="Probability of applying QAT per batch (default: 0.5)")
+    parser.add_argument("--qat_mode", type=str, default="ste", choices=["ste", "noise"],
+                        help="QAT mode: 'ste' (straight-through) or 'noise' (quantization noise)")
 
     # Output parameters
     parser.add_argument("--output_dir", type=str, default="./outputs/week1",
@@ -252,6 +263,10 @@ def train_epoch(
     device: torch.device,
     use_weights: bool = False,
     weight_alpha: float = 2.0,
+    quantization_aware: bool = False,
+    quantization_bits: int = 4,
+    qat_probability: float = 0.5,
+    qat_mode: str = "ste",
 ) -> Dict[str, float]:
     """Train for one epoch."""
     model.train()
@@ -260,13 +275,26 @@ def train_epoch(
 
     requires_latent = getattr(loss_fn, "requires_latent", False)
 
+    # Import QAT functions if needed
+    if quantization_aware:
+        from ecgdae.quantization import quantize_with_ste, add_quantization_noise
+
     for noisy, clean in train_loader:
         noisy = noisy.to(device)
         clean = clean.to(device)
 
         # Forward pass
-        if requires_latent:
+        if requires_latent or quantization_aware:
             recon, latents = model(noisy, return_latent=True)
+
+            # Apply quantization-aware training
+            if quantization_aware and random.random() < qat_probability:
+                if qat_mode == "ste":
+                    latents = quantize_with_ste(latents, quantization_bits)
+                else:  # noise mode
+                    latents = add_quantization_noise(latents, quantization_bits)
+                # Reconstruct with quantized latents
+                recon = model.decode(latents)
         else:
             recon = model(noisy)
             latents = None
@@ -549,7 +577,11 @@ def main():
         # Train
         train_metrics = train_epoch(
             model, train_loader, loss_fn, optimizer, device,
-            use_weights=use_weights, weight_alpha=args.weight_alpha
+            use_weights=use_weights, weight_alpha=args.weight_alpha,
+            quantization_aware=args.quantization_aware,
+            quantization_bits=args.quantization_bits,
+            qat_probability=args.qat_probability,
+            qat_mode=args.qat_mode,
         )
 
         # Validate

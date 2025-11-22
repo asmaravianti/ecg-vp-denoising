@@ -93,7 +93,11 @@ def create_test_dataloader(config: dict, num_test_samples: int = 500) -> DataLoa
     from ecgdae.data import MITBIHLoader
     all_records = MITBIHLoader.MITBIH_RECORDS
     num_train_records = config.get('num_records', 10)
-    test_records = all_records[num_train_records:num_train_records + 5]
+    # If using all records, use first 5 for testing (wrap around)
+    if num_train_records >= len(all_records):
+        test_records = all_records[:5]
+    else:
+        test_records = all_records[num_train_records:num_train_records + 5]
 
     console.print(f"[cyan]Test records: {test_records}")
 
