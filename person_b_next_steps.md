@@ -150,3 +150,5 @@ I'll create a script for you to run Option 1 (continue training):
 
 **Note:** Person B's goal is to reduce PRD. Even if QS doesn't reach 1.0, lower PRD will help when combined with Person A's higher CR results.
 
+
+

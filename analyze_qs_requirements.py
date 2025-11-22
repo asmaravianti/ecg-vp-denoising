@@ -82,3 +82,5 @@ print("\nYour current: QS ≈ 0.15 (needs significant improvement)")
 
 print("\n" + "=" * 80)
 
+
+
