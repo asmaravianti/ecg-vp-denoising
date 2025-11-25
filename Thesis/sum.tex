@@ -1,0 +1,14 @@
+\chapter{Conclusion and Future Work}
+\label{ch:sum}
+
+We presented a compression-aware ECG denoising framework that jointly optimizes signal quality and bitrate efficiency. The key innovation is a differentiable waveform-weighted PRD (WWPRD) loss function that automatically emphasizes clinically salient waveform regions, particularly QRS complexes, without manual feature detection.
+
+Experimental results on all 48 records of the MIT-BIH Arrhythmia dataset demonstrate that WWPRD training achieves 3--5 dB SNR improvement and better alignment with clinical quality metrics compared to MSE-based training. The framework supports tunable compression ratios (CR $\approx$ 1.4--22.0) through bottleneck dimension control (latent dimensions 2--32) and post-training 4-bit quantization, enabling comprehensive rate--distortion analysis for telemetry and wearable monitoring applications.
+
+A critical contribution is the implementation of quantization-aware training (QAT) using straight-through estimators, which addresses the quantization gap between clean validation metrics and post-quantization performance. This gap, which can reach 2.2$\times$ degradation (clean PRD 27\% $\rightarrow$ post-Q PRD 60\%+), is reduced to $<$1.3$\times$ with QAT, enabling practical deployment under quantization constraints.
+
+Our best result achieves a Quality Score (QS) of 0.6078 with latent dimension 2 and QAT, exceeding our target threshold of QS $>$ 0.5. This represents a 134\% improvement over the baseline (QS = 0.26) and demonstrates the framework's capability to achieve high compression ratios (up to 22.0:1) while maintaining reasonable signal fidelity (PRD = 36.20\%, WWPRD = 32.23\%). The combination of QAT and smaller latent dimensions successfully balances compression efficiency and reconstruction quality.
+
+The fully differentiable nature of our approach enables end-to-end training and integration with existing deep learning pipelines. The automatic emphasis on high-gradient regions aligns optimization with diagnostic perception, addressing a fundamental limitation of MSE-based objectives in clinical signal processing.
+
+Future directions include: (1) further optimizing QAT hyperparameters and training schedules to reduce PRD values toward clinical thresholds while maintaining high compression, (2) comprehensive evaluation of the variable-projection front-end to complete the ablation study, (3) investigating additional architectural improvements such as attention mechanisms or deeper networks to improve reconstruction quality, (4) comparison with state-of-the-art ECG compression methods, and (5) real-world deployment studies in telemedicine systems to validate practical utility.

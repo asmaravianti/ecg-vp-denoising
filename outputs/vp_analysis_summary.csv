@@ -1,0 +1,6 @@
+﻿实验,记录数,Epochs,Latent Dim,QAT,Clean PRD (%),Clean WWPRD (%),SNR改善 (dB),Post-Q PRD (%),CR,QS,有模型,有压缩评估
+vp_dry_run,3,1,2,✓,64.92,73.64,-1.92,N/A,N/A,N/A,✗,✗
+vp_experiment_latent2,48,50,2,✓,N/A,N/A,N/A,N/A,N/A,N/A,✗,✗
+vp_final,10,20,2,✓,24.73,21.30,7.02,N/A,N/A,N/A,✓,✗
+vp_quick_test,10,5,2,✓,25.13,21.58,6.99,N/A,N/A,0.7235*,✗,✗
+vp_smoke_test,3,2,32,✗,48.37,47.52,0.72,N/A,N/A,N/A,✗,✗

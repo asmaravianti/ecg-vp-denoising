@@ -1,0 +1,26 @@
+{
+  "data_dir": "./data/mitbih",
+  "num_records": 20,
+  "window_seconds": 2.0,
+  "sample_rate": 360,
+  "noise_type": "nstdb",
+  "snr_db": 10.0,
+  "nstdb_noise": "muscle_artifact",
+  "model_type": "residual",
+  "hidden_dims": [
+    32,
+    64,
+    128
+  ],
+  "latent_dim": 32,
+  "loss_type": "wwprd",
+  "weight_alpha": 2.0,
+  "batch_size": 32,
+  "epochs": 60,
+  "lr": 0.0005,
+  "weight_decay": 0.0001,
+  "val_split": 0.15,
+  "output_dir": "./outputs/residual_wwprd_60e",
+  "save_model": true,
+  "device": "auto"
+}

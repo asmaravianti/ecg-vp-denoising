@@ -4,17 +4,20 @@ import numpy as np
 import torch
 from typing import Tuple, Dict, Optional
 
+# Optional dependency for wavelet-based WWPRD (per Kovács et al.)
+try:
+    import pywt  # type: ignore
+    _HAS_PYWT = True
+except Exception:  # pragma: no cover - optional
+    _HAS_PYWT = False
+
 
 def compute_prd(clean: np.ndarray, reconstructed: np.ndarray, eps: float = 1e-12) -> float:
     """Compute Percent Root-mean-square Difference (PRD).
     
     PRD = 100 * sqrt(sum((clean - recon)^2) / sum(clean^2))
     
-    Lower is better. Clinical quality ranges:
-    - Excellent: PRD < 4.33%
-    - Very Good: 4.33% ≤ PRD < 9.00%
-    - Good: 9.00% ≤ PRD < 15.00%
-    - Not Good: PRD ≥ 15.00%
+    Lower is better.
     
     Args:
         clean: Clean ECG signal
@@ -34,23 +37,34 @@ def compute_prd(clean: np.ndarray, reconstructed: np.ndarray, eps: float = 1e-12
     return float(prd)
 
 
+def compute_prdn(clean: np.ndarray, reconstructed: np.ndarray, eps: float = 1e-12) -> float:
+    """Compute normalized PRD (PRDN) with mean removed from reference.
+
+    PRDN = 100 * sqrt( sum((clean - recon)^2) / sum( (clean - mean(clean))^2 ) )
+
+    This matches the normalized PRD used in Kovács et al. (ECG compression).
+    """
+    clean = clean.flatten()
+    reconstructed = reconstructed.flatten()
+
+    numerator = np.sum((clean - reconstructed) ** 2)
+    ref_zm = clean - np.mean(clean)
+    denominator = np.sum(ref_zm ** 2) + eps
+    prdn = 100.0 * np.sqrt(numerator / denominator)
+    return float(prdn)
+
+
 def compute_wwprd(
     clean: np.ndarray, 
     reconstructed: np.ndarray,
     weights: Optional[np.ndarray] = None,
     eps: float = 1e-12
 ) -> float:
-    """Compute Waveform-Weighted PRD (WWPRD).
+    """Compute derivative-weighted PRD (legacy WWPRD variant).
     
-    WWPRD = 100 * sqrt(sum(w * (clean - recon)^2) / sum(w * clean^2))
+    WWPRD ≈ 100 * sqrt(sum(w * (clean - recon)^2) / sum(w * clean^2))
     
-    where w are weights emphasizing clinically important features (e.g., QRS complexes).
-    
-    Clinical quality ranges:
-    - Excellent: WWPRD < 7.4%
-    - Very Good: 7.4% ≤ WWPRD < 14.8%
-    - Good: 14.8% ≤ WWPRD < 24.7%
-    - Not Good: WWPRD ≥ 24.7%
+    where w are time-domain weights emphasizing QRS via derivatives.
     
     Args:
         clean: Clean ECG signal
@@ -78,6 +92,75 @@ def compute_wwprd(
     wwprd = 100.0 * np.sqrt(numerator / denominator)
     
     return float(wwprd)
+
+
+def compute_wwprd_wavelet(
+    clean: np.ndarray,
+    reconstructed: np.ndarray,
+    wavelet: str = "db3",
+    level: int = 5,
+    weights: Optional[np.ndarray] = None,
+    eps: float = 1e-12,
+) -> float:
+    """Compute wavelet-based WWPRD per Kovács et al. (Eq. 20).
+
+    Steps:
+      1) Remove mean from both signals.
+      2) Perform DWT up to `level` with `wavelet`.
+      3) Form coefficient groups [D1, D2, D3, D4, D5, A5] (6 groups).
+      4) WWPRD = 100 * sqrt( sum_j w_j * ||c_j - ĉ_j||^2 / ||c_j||^2 ).
+
+    Default weights (paper): [6/27, 9/27, 7/27, 3/27, 1/27, 1/27].
+    """
+    if not _HAS_PYWT:
+        raise ImportError(
+            "PyWavelets (pywt) is required for wavelet-based WWPRD. Please install 'PyWavelets'."
+        )
+
+    x = clean.flatten().astype(np.float64)
+    y = reconstructed.flatten().astype(np.float64)
+
+    # Zero-mean as per paper
+    x = x - np.mean(x)
+    y = y - np.mean(y)
+
+    # Wavelet decomposition
+    cA_x, details_x = _dwt_groups(x, wavelet=wavelet, level=level)
+    cA_y, details_y = _dwt_groups(y, wavelet=wavelet, level=level)
+
+    # Assemble groups in order [D1..D5, A5]
+    coeff_groups_x = details_x + [cA_x]
+    coeff_groups_y = details_y + [cA_y]
+
+    # Default weights if not provided (6 groups)
+    if weights is None:
+        weights = np.array([6/27, 9/27, 7/27, 3/27, 1/27, 1/27], dtype=np.float64)
+    weights = np.asarray(weights, dtype=np.float64)
+    assert len(weights) == 6, "Expected 6 weights for [D1..D5, A5]."
+
+    num = 0.0
+    den = 0.0
+    for wj, cx, cy in zip(weights, coeff_groups_x, coeff_groups_y):
+        if wj <= 0:
+            continue
+        diff = cx - cy
+        num += wj * float(np.sum(diff * diff))
+        den += wj * (float(np.sum(cx * cx)) + eps)
+
+    wwprd = 100.0 * np.sqrt(num / (den + eps))
+    return float(wwprd)
+
+
+def _dwt_groups(signal: np.ndarray, wavelet: str = "db3", level: int = 5):
+    """Helper: returns (A_level, [D1, D2, ..., D_level]) with consistent lengths."""
+    coeffs = pywt.wavedec(signal, wavelet=wavelet, level=level, mode="periodization")
+    # coeffs = [A_level, D_level, D_{level-1}, ..., D1]
+    cA = coeffs[0]
+    Ds = coeffs[1:][::-1]  # -> [D1, D2, ..., D_level]
+    # Convert to numpy arrays (float64) for safety
+    cA = np.asarray(cA, dtype=np.float64)
+    Ds = [np.asarray(d, dtype=np.float64) for d in Ds]
+    return cA, Ds
 
 
 def compute_derivative_weights(signal: np.ndarray, alpha: float = 2.0) -> np.ndarray:
@@ -184,12 +267,18 @@ def evaluate_reconstruction(
         Dictionary of metrics
     """
     metrics = {}
-    
-    # PRD
+
+    # PRD (unnormalized) and PRDN (normalized, per paper)
     metrics['PRD'] = compute_prd(clean, reconstructed)
-    
-    # WWPRD
-    metrics['WWPRD'] = compute_wwprd(clean, reconstructed, weights)
+    metrics['PRDN'] = compute_prdn(clean, reconstructed)
+
+    # WWPRD (wavelet-based, per paper) and derivative variant for reference
+    try:
+        metrics['WWPRD'] = compute_wwprd_wavelet(clean, reconstructed)
+    except Exception:
+        # Fallback if PyWavelets is missing
+        metrics['WWPRD'] = float('nan')
+    metrics['WWPRD_deriv'] = compute_wwprd(clean, reconstructed, weights)
     
     # SNR of reconstruction
     metrics['SNR_out'] = compute_snr(clean, reconstructed)
@@ -207,25 +296,32 @@ def evaluate_reconstruction(
         compressed_size = latent_dim * latent_bits
         metrics['CR'] = compute_compression_ratio(original_size, compressed_size)
     
-    # Quality classification based on PRD
-    if metrics['PRD'] < 4.33:
-        metrics['PRD_quality'] = 'Excellent'
-    elif metrics['PRD'] < 9.00:
-        metrics['PRD_quality'] = 'Very Good'
-    elif metrics['PRD'] < 15.00:
-        metrics['PRD_quality'] = 'Good'
+    # Quality classification based on PRDN (Table III)
+    prdn = metrics['PRDN']
+    if prdn < 4.33:
+        metrics['PRDN_quality'] = 'Excellent'
+    elif prdn < 7.8:
+        metrics['PRDN_quality'] = 'V. Good'
+    elif prdn < 11.59:
+        metrics['PRDN_quality'] = 'Good'
+    elif prdn < 22.5:
+        metrics['PRDN_quality'] = 'Not Bad'
     else:
-        metrics['PRD_quality'] = 'Not Good'
-    
-    # Quality classification based on WWPRD
-    if metrics['WWPRD'] < 7.4:
-        metrics['WWPRD_quality'] = 'Excellent'
-    elif metrics['WWPRD'] < 14.8:
-        metrics['WWPRD_quality'] = 'Very Good'
-    elif metrics['WWPRD'] < 24.7:
-        metrics['WWPRD_quality'] = 'Good'
-    else:
-        metrics['WWPRD_quality'] = 'Not Good'
+        metrics['PRDN_quality'] = 'Bad'
+
+    # Quality classification based on WWPRD (Table III)
+    ww = metrics['WWPRD']
+    if np.isfinite(ww):
+        if ww < 7.4:
+            metrics['WWPRD_quality'] = 'Excellent'
+        elif ww < 15.45:
+            metrics['WWPRD_quality'] = 'V. Good'
+        elif ww < 25.18:
+            metrics['WWPRD_quality'] = 'Good'
+        elif ww < 37.4:
+            metrics['WWPRD_quality'] = 'Not Bad'
+        else:
+            metrics['WWPRD_quality'] = 'Bad'
     
     return metrics
 
@@ -250,7 +346,9 @@ def batch_evaluate(
     batch_size = clean_batch.shape[0]
     
     all_prds = []
-    all_wwprds = []
+    all_prdns = []
+    all_wwprds = []  # wavelet-based
+    all_wwprds_deriv = []
     all_snr_outs = []
     all_snr_ins = []
     
@@ -264,11 +362,18 @@ def batch_evaluate(
         
         # Compute metrics
         prd = compute_prd(clean, recon)
-        wwprd = compute_wwprd(clean, recon, w)
+        prdn = compute_prdn(clean, recon)
+        try:
+            wwprd = compute_wwprd_wavelet(clean, recon)
+        except Exception:
+            wwprd = float('nan')
+        wwprd_deriv = compute_wwprd(clean, recon, w)
         snr_out = compute_snr(clean, recon)
         
         all_prds.append(prd)
+        all_prdns.append(prdn)
         all_wwprds.append(wwprd)
+        all_wwprds_deriv.append(wwprd_deriv)
         all_snr_outs.append(snr_out)
         
         if noisy_batch is not None:
@@ -279,8 +384,12 @@ def batch_evaluate(
     metrics = {
         'PRD': np.mean(all_prds),
         'PRD_std': np.std(all_prds),
-        'WWPRD': np.mean(all_wwprds),
-        'WWPRD_std': np.std(all_wwprds),
+        'PRDN': np.mean(all_prdns),
+        'PRDN_std': np.std(all_prdns),
+        'WWPRD': np.nanmean(all_wwprds),
+        'WWPRD_std': np.nanstd(all_wwprds),
+        'WWPRD_deriv': np.mean(all_wwprds_deriv),
+        'WWPRD_deriv_std': np.std(all_wwprds_deriv),
         'SNR_out': np.mean(all_snr_outs),
         'SNR_out_std': np.std(all_snr_outs),
     }

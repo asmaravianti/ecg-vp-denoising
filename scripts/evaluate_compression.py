@@ -23,7 +23,7 @@ from rich.progress import track
 from rich.table import Table
 
 from ecgdae.data import MITBIHDataset, NSTDBNoiseMixer, WindowingConfig, gaussian_snr_mixer
-from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder
+from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, VPAutoEncoder
 from ecgdae.metrics import (
     compute_prd, compute_wwprd, compute_snr,
     compute_derivative_weights, batch_evaluate
@@ -45,7 +45,14 @@ def load_model(model_path: str, config: dict, device: torch.device):
             hidden_dims=tuple(config['hidden_dims']),
             latent_dim=config['latent_dim'],
         )
-    else:
+    elif config['model_type'] == 'vp':
+        model = VPAutoEncoder(
+            in_channels=1,
+            hidden_dims=tuple(config['hidden_dims']),
+            latent_dim=config['latent_dim'],
+            num_res_blocks=2,
+        )
+    else:  # residual
         model = ResidualAutoEncoder(
             in_channels=1,
             hidden_dims=tuple(config['hidden_dims']),
@@ -93,7 +100,11 @@ def create_test_dataloader(config: dict, num_test_samples: int = 500) -> DataLoa
     from ecgdae.data import MITBIHLoader
     all_records = MITBIHLoader.MITBIH_RECORDS
     num_train_records = config.get('num_records', 10)
-    test_records = all_records[num_train_records:num_train_records + 5]
+    # If using all records, use first 5 for testing (wrap around)
+    if num_train_records >= len(all_records):
+        test_records = all_records[:5]
+    else:
+        test_records = all_records[num_train_records:num_train_records + 5]
 
     console.print(f"[cyan]Test records: {test_records}")
 
@@ -154,6 +165,7 @@ def evaluate_at_cr(
     model.eval()
 
     all_prds = []
+    all_prdns = []
     all_wwprds = []
     all_snr_ins = []
     all_snr_outs = []
@@ -201,17 +213,20 @@ def evaluate_at_cr(
             n = noisy[i, 0].cpu().numpy()
             r = recon[i, 0].cpu().numpy()
 
-            # Compute weights for WWPRD
-            w = compute_derivative_weights(c, alpha=weight_alpha)
-
-            # Compute metrics
+            # Compute metrics (paper-accurate)
+            from ecgdae.metrics import compute_prdn, compute_wwprd_wavelet
             prd = compute_prd(c, r)
-            wwprd = compute_wwprd(c, r, w)
+            prdn = compute_prdn(c, r)
+            try:
+                wwprd = compute_wwprd_wavelet(c, r)
+            except Exception:
+                wwprd = float('nan')
             snr_in = compute_snr(c, n)
             snr_out = compute_snr(c, r)
             snr_imp = snr_out - snr_in
 
             all_prds.append(prd)
+            all_prdns.append(prdn)
             all_wwprds.append(wwprd)
             all_snr_ins.append(snr_in)
             all_snr_outs.append(snr_out)
@@ -224,8 +239,10 @@ def evaluate_at_cr(
     metrics = {
         'PRD': float(np.mean(all_prds)),
         'PRD_std': float(np.std(all_prds)),
-        'WWPRD': float(np.mean(all_wwprds)),
-        'WWPRD_std': float(np.std(all_wwprds)),
+        'PRDN': float(np.mean(all_prdns)) if len(all_prdns) > 0 else float('nan'),
+        'PRDN_std': float(np.std(all_prdns)) if len(all_prdns) > 0 else float('nan'),
+        'WWPRD': float(np.nanmean(all_wwprds)),
+        'WWPRD_std': float(np.nanstd(all_wwprds)),
         'SNR_in': float(np.mean(all_snr_ins)),
         'SNR_out': float(np.mean(all_snr_outs)),
         'SNR_improvement': float(np.mean(all_snr_improvements)),

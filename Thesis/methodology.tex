@@ -1,0 +1,112 @@
+\chapter{Methodology}
+\label{ch:methodology}
+
+\section{Waveform-Weighted PRD Loss}
+
+The conventional PRD metric is defined as:
+\begin{equation}
+\text{PRD} = 100 \times \sqrt{\frac{\sum_{t=1}^{T}(x_t - \hat{x}_t)^2}{\sum_{t=1}^{T}x_t^2}}
+\end{equation}
+where $x_t$ is the clean signal and $\hat{x}_t$ is the reconstructed signal at time $t$.
+
+To emphasize clinically important waveform regions, we introduce waveform-weighted PRD (WWPRD):
+\begin{equation}
+\text{WWPRD} = 100 \times \sqrt{\frac{\sum_{t=1}^{T}w_t(x_t - \hat{x}_t)^2}{\sum_{t=1}^{T}w_t x_t^2}}
+\end{equation}
+where the weights $w_t$ are derived from signal derivatives:
+\begin{equation}
+w_t = 1 + \alpha \cdot \frac{|dx_t/dt|}{\max_t(|dx_t/dt|)}
+\end{equation}
+The parameter $\alpha$ (default 2.0) controls the emphasis strength. This formulation automatically highlights QRS complexes and other high-gradient regions without requiring manual R-peak detection.
+
+\begin{figure}[t]
+    \centering
+    \fbox{\parbox{0.92\linewidth}{
+        \textbf{Stage A -- Noise-Aware Weighting:} Raw MIT-BIH segments are augmented with NSTDB noise, then differentiated to obtain $|dx/dt|$ profiles.\\[2pt]
+        \textbf{Stage B -- WWPRD Mask:} The derivative profile is normalized and scaled by $\alpha$, yielding a soft attention mask over time samples.\\[2pt]
+        \textbf{Stage C -- Gradient-Aligned Loss:} Reconstruction residuals $(x - \hat{x})^2$ are multiplied by the mask before accumulation, producing a differentiable loss that prioritizes high-morphology regions.
+    }}
+    \caption{Overview of the differentiable WWPRD weighting pipeline used during training. Each step is implemented with standard tensor operations, enabling backpropagation through the weighting mask.}
+    \label{fig:wwprd_pipeline}
+\end{figure}
+
+\section{Data Pipeline and Pre-Processing}
+
+Each ECG record is split into 2-second windows (512 samples at 360 Hz) with 50\% overlap to ensure coverage of QRS complexes near window boundaries. We standardize each window to zero mean and unit variance before adding muscle artefact noise from the NSTDB generator at 10 dB SNR. The noisy-clean pair is cached on disk alongside metadata such as record ID, beat annotations, and noise seed. This metadata enables stratified batching where each mini-batch contains a balanced mix of arrhythmia types, improving the robustness of the WWPRD weights to morphology diversity.
+
+\section{Model Architecture}
+
+We employ a 1-D convolutional autoencoder with residual connections. The encoder progressively downsamples the input through stride-2 convolutions:
+\begin{itemize}
+    \item Input: 512 samples (2 seconds at 360 Hz)
+    \item Encoder: 4 layers with hidden dimensions [32, 64, 128, 32]
+    \item Bottleneck: 32 latent features (tunable for compression control)
+    \item Decoder: 4 transposed convolution layers mirroring the encoder
+\end{itemize}
+
+The model contains approximately 387K parameters. Compression ratio is controlled by the bottleneck dimension and post-training quantization (4-bit, 6-bit, or 8-bit).
+
+\section{End-to-End Optimization Pipeline}
+
+Training proceeds in three synchronized loops: (1) data augmentation and batching, (2) forward pass with optional quantization, and (3) metric logging plus checkpointing. Figure~\ref{fig:wwprd_pipeline} depicts how WWPRD weights enter the loss calculation, while Figure~\ref{fig:qat_algo} summarises the quantization-aware optimisation routine in a reviewer-friendly algorithmic format.
+
+\begin{figure}[t]
+    \centering
+    \fbox{\parbox{0.92\linewidth}{
+        \textbf{Algorithm 1: WWPRD-Guided QAT}\\
+        \begin{enumerate}
+            \item Compute derivative-based weights $w$ for the clean segment $x$.
+            \item Encode noisy input $y$ through $E_{\theta}$ to obtain latent $z$.
+            \item With probability $p$, quantize $z$ to $z'=Q(z, b)$; otherwise keep $z$.
+            \item Decode $\hat{x}=D_{\phi}(z')$ and evaluate WWPRD plus latent regularisation.
+            \item Backpropagate using a straight-through estimator so gradients cross the quantizer.
+            \item Update $\theta,\phi$ with AdamW, then log PRD/WWPRD/SNR/CR statistics.
+        \end{enumerate}
+    }}
+    \caption{Pseudo-code style summary of the quantization-aware training loop. Although expressed as a boxed figure for compatibility with the template, the steps correspond to the actual implementation in Listing~\ref{lst:training-loop}.}
+    \label{fig:qat_algo}
+\end{figure}
+
+\section{Variable-Projection Front-End}
+
+We investigate replacing the first encoder convolution with a learnable variable-projection (VP) layer. This structured embedding layer projects input windows onto a learned orthogonal basis, potentially improving the denoising--compression trade-off by capturing signal structure more efficiently than standard convolutions.
+
+The VP front-end is implemented as a convolutional layer with orthogonal weight initialization, simulating a projection onto a learned basis set. Unlike standard convolutions that learn arbitrary filters, the VP layer constrains the learned representations to lie on an orthogonal basis, which may better preserve signal structure at low bitrates. The layer is trained end-to-end with the rest of the autoencoder, allowing the basis functions to adapt to ECG signal characteristics.
+
+\section{Quantization-Aware Training}
+
+A critical challenge in compression-aware denoising is the gap between clean validation metrics and post-quantization performance. Models trained on continuous latents may achieve good clean validation PRD (e.g., 27\%) but degrade significantly after quantization (PRD 60\%+), representing a 2.2$\times$ degradation. To address this, we implement quantization-aware training (QAT) using a straight-through estimator (STE).
+
+During training, with probability $p$ (default 0.5), we simulate quantization on the latent representation before decoding:
+\begin{equation}
+z_q = \text{STE}(Q(z, n_bits))
+\end{equation}
+where $Q$ is the quantization function and STE passes gradients through as identity in the backward pass. This enables the model to learn representations robust to quantization while maintaining end-to-end differentiability.
+
+We support two QAT modes: (1) exact quantization simulation using STE, and (2) quantization noise injection that adds uniform noise matching quantization error variance. The latter can be more stable during early training phases.
+
+\section{Training Configuration}
+
+Models are trained on 20--48 MIT-BIH records (depending on configuration) with NSTDB muscle artifact noise at 10 dB SNR. We use AdamW optimizer with learning rate 0.001, weight decay 0.00001, and cosine annealing schedule over 50--200 epochs. The validation split is 15\%. For QAT-enabled training, we apply quantization simulation with probability 0.5--0.7 and 4-bit quantization to match evaluation conditions. Our best-performing model (latent dimension 2 with QAT) was trained for 200 epochs using all 48 records with qat\_probability=0.7.
+
+\section{Implementation Artifacts and Reproducibility}
+
+All experiments are run with deterministic PyTorch kernels, fixed random seeds, and Hydra configuration files that capture hyper-parameters and dataset splits. Listing~\ref{lst:training-loop} shows the core training loop shared across experiments. Model checkpoints, tensorboard logs, and evaluation scripts are versioned inside the repository under `outputs/week*`.
+
+\begin{lstlisting}[language=Python, caption={PyTorch-style training loop implementing WWPRD-guided QAT. The function exposes hooks for ablations, reproducibility, and export to ONNX.}, label={lst:training-loop}]
+def train_step(batch, model, wwprd_loss, quantizer, p=0.5):
+    noisy, clean = batch["noisy"].to(device), batch["clean"].to(device)
+    weights = wwprd_loss.derive_weights(clean)
+    latent = model.encoder(noisy)
+    if torch.rand(1) < p:
+        latent = quantizer(latent)
+    recon = model.decoder(latent)
+    loss = wwprd_loss(clean, recon, weights) + 1e-4 * latent.pow(2).mean()
+    optimizer.zero_grad()
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 5.0)
+    optimizer.step()
+    metrics = metric_logger(clean, recon, latent)
+    return loss.item(), metrics
+\end{lstlisting}
+
