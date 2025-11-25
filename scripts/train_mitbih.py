@@ -29,7 +29,7 @@ from ecgdae.losses import (
     CombinedPRDWWPRDLoss,
     WWPRDL1Loss,
 )
-from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, count_parameters
+from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, VPAutoEncoder, count_parameters
 from ecgdae.metrics import batch_evaluate, format_metrics, compute_derivative_weights
 
 console = Console()
@@ -60,7 +60,7 @@ def setup_args():
 
     # Model parameters
     parser.add_argument("--model_type", type=str, default="conv",
-                        choices=["conv", "residual"],
+                        choices=["conv", "residual", "vp"],
                         help="Model architecture")
     parser.add_argument("--hidden_dims", type=int, nargs="+", default=[32, 64, 128],
                         help="Hidden dimensions for encoder")
@@ -128,13 +128,22 @@ def create_model(args) -> nn.Module:
             hidden_dims=tuple(args.hidden_dims),
             latent_dim=args.latent_dim,
         )
-    else:  # residual
+    elif args.model_type == "residual":
         model = ResidualAutoEncoder(
             in_channels=1,
             hidden_dims=tuple(args.hidden_dims),
             latent_dim=args.latent_dim,
             num_res_blocks=2,
         )
+    elif args.model_type == "vp":
+        model = VPAutoEncoder(
+            in_channels=1,
+            hidden_dims=tuple(args.hidden_dims),
+            latent_dim=args.latent_dim,
+            num_res_blocks=2,
+        )
+    else:
+        raise ValueError(f"Unknown model type: {args.model_type}")
 
     console.print(f"[green]Model: {args.model_type}")
     console.print(f"[green]Parameters: {count_parameters(model):,}")

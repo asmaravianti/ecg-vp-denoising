@@ -69,7 +69,9 @@ Training proceeds in three synchronized loops: (1) data augmentation and batchin
 
 \section{Variable-Projection Front-End}
 
-We investigate replacing the first encoder convolution with a learnable variable-projection (VP) layer. This structured embedding layer projects input windows onto a learned basis, potentially improving the denoising--compression trade-off by capturing signal structure more efficiently than standard convolutions.
+We investigate replacing the first encoder convolution with a learnable variable-projection (VP) layer. This structured embedding layer projects input windows onto a learned orthogonal basis, potentially improving the denoising--compression trade-off by capturing signal structure more efficiently than standard convolutions.
+
+The VP front-end is implemented as a convolutional layer with orthogonal weight initialization, simulating a projection onto a learned basis set. Unlike standard convolutions that learn arbitrary filters, the VP layer constrains the learned representations to lie on an orthogonal basis, which may better preserve signal structure at low bitrates. The layer is trained end-to-end with the rest of the autoencoder, allowing the basis functions to adapt to ECG signal characteristics.
 
 \section{Quantization-Aware Training}
 

@@ -23,7 +23,7 @@ from rich.progress import track
 from rich.table import Table
 
 from ecgdae.data import MITBIHDataset, NSTDBNoiseMixer, WindowingConfig, gaussian_snr_mixer
-from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder
+from ecgdae.models import ConvAutoEncoder, ResidualAutoEncoder, VPAutoEncoder
 from ecgdae.metrics import (
     compute_prd, compute_wwprd, compute_snr,
     compute_derivative_weights, batch_evaluate
@@ -45,7 +45,14 @@ def load_model(model_path: str, config: dict, device: torch.device):
             hidden_dims=tuple(config['hidden_dims']),
             latent_dim=config['latent_dim'],
         )
-    else:
+    elif config['model_type'] == 'vp':
+        model = VPAutoEncoder(
+            in_channels=1,
+            hidden_dims=tuple(config['hidden_dims']),
+            latent_dim=config['latent_dim'],
+            num_res_blocks=2,
+        )
+    else:  # residual
         model = ResidualAutoEncoder(
             in_channels=1,
             hidden_dims=tuple(config['hidden_dims']),
